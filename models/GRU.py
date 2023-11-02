@@ -7,6 +7,10 @@ import tensorflow as tf
 from tensorflow.keras.callbacks import TensorBoard
 import os
 import time
+
+from physics.metrics import elastic_modulus
+
+
 class BidirectionalGRUModel:
     def __init__(self, input_shape, units, output_size):
         # Define model
@@ -22,7 +26,7 @@ class BidirectionalGRUModel:
         self.model.add(Dense(output_size))
         self.model.compile(loss='mean_squared_error',
                            optimizer=Adam(learning_rate=0.001),
-                           metrics=['mean_absolute_error'])
+                           metrics=['mean_absolute_error', elastic_modulus])
         self.model.summary()
 
     def train_model(self, X_train, y_train, epochs=100, batch_size=32, validation_split=0.2):

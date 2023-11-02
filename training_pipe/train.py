@@ -25,6 +25,7 @@ def train_PINN():
 
     # Save the data to a pandas DataFrame
     df = data_processor.save_to_dataframe()
+
     features = ['Standardkraft (MPa)', 'Traversenweg absolut (mm)', 'Traversengeschwindigkeit (mm/min)',
                 'Verfestigungsexponent ()', 'senkrechte Anisotropie ()', ' (s/Mpa)']
     target = 'Dehnung (%)'
