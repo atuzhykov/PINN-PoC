@@ -1,99 +1,97 @@
-import xlrd
+import numpy as np
 import pandas as pd
 
 
-class ExcelReader:
-    def __init__(self, file_path, sheets_names=None):
-        self.file_path = file_path
-        self.workbook = xlrd.open_workbook(file_path)
-        self.sheets = [self.workbook.sheet_by_name(sheet_idx) for sheet_idx in sheets_names]
-
-    def read_data(self):
-        sheets_data = []
-        for sheet in self.sheets:
-            data = []
-            for row in range(sheet.nrows):
-                row_data = []
-                for col in range(sheet.ncols):
-                    cell_value = sheet.cell_value(row, col)
-                    row_data.append(cell_value)
-                data.append(row_data)
-            sheets_data.append(data)
-        return sheets_data
-
-
 class DataProcessor:
-    def __init__(self, data):
-        self.data = data
-
-    def find_common_columns(self, list_of_dfs):
-        """
-        Takes a list of pandas DataFrames and returns a list of column names
-        common to all the DataFrames in the list.
-
-        Parameters:
-        list_of_dfs (list): A list of pandas DataFrame objects.
-
-        Returns:
-        list: A list of column names common to all DataFrames.
-        """
-
-        # Check if the list is not empty and contains DataFrames
-        if not list_of_dfs or not all(isinstance(df, pd.DataFrame) for df in list_of_dfs):
-            raise ValueError("Please provide a non-empty list of pandas DataFrames.")
-
-        # Convert the columns of the first DataFrame to a set
-        common_columns_set = set(list_of_dfs[0].columns)
-
-        # Find the intersection with the sets of columns from the other DataFrames
-        for dataframe in list_of_dfs[1:]:
-            common_columns_set &= set(dataframe.columns)
-        # Convert the resulting set to a list
-        common_columns_list = list(common_columns_set)
-
-        return common_columns_list
-
-    def format_dataframe(self, chunk):
-        """
-        Formats a chunk of data into a DataFrame by setting the appropriate headers and indices.
-
-        Parameters:
-        chunk (iterable): A chunk of data.
-
-        Returns:
-        DataFrame: A formatted DataFrame with the appropriate headers and reset indices.
-        """
-        df = pd.DataFrame(chunk).drop([0])
-
-        # Create new headers, ensuring they are unique by adding a sequence number if necessary.
-        new_header = df.iloc[0] + ' (' + df.iloc[1] + ')'
-        if new_header.duplicated().any():
-            # If there are duplicates, we create a unique sequence to append to the duplicates.
-            new_header += new_header.groupby(new_header).cumcount().astype(str).replace('0', '')
-
-        # Apply the new unique headers and format the DataFrame.
-        df = df[2:]
-        df.columns = new_header
-        return df.reset_index(drop=True)
+    def __init__(self, file_path):
+        self.file_path = file_path
+        self.df = None
+        self.index_names = {
+            0: 'VIX',
+            1: 'DJI',
+            2: 'RUT',
+            3: 'FTSE',
+            4: 'HSI',
+            5: 'GDAXI',
+            6: 'IXIC',
+            7: 'NYA',
+            8: 'N225',
+            9: 'GSPC',
+        }
 
     def save_to_dataframe(self):
-        formatted_dfs = [self.format_dataframe(chunk) for chunk in self.data]
 
-        common_columns = self.find_common_columns(formatted_dfs)
-        if not common_columns:
-            raise ValueError("No common columns exist across the DataFrames.")
+        self.df = pd.read_csv(self.file_path, skiprows=1, index_col=0)
 
-        combined_df = pd.DataFrame()
+        # Convert the index to a datetime object
+        self.df.index = pd.to_datetime(self.df.index)
+        new_columns = []
+        for col in self.df.columns:
+            parts = col.split('.')
+            if len(parts) < 2:
+                new_col = self.index_names[0] + "_" + parts[0]
+            else:
+                new_col = self.index_names[int(parts[1])] + "_" + parts[0]
+            new_col = new_col.replace(" ", "_")
+            new_columns.append(new_col)
 
-        # Iterate over the list of DataFrames
-        for df in formatted_dfs:
-            # Select only the common columns for the current DataFrame
-            selected_columns_df = df[common_columns]
+        self.df.columns = new_columns
+        return self.df
 
-            # Append the selected columns to the combined DataFrame
-            combined_df = pd.concat([combined_df, selected_columns_df], ignore_index=True)
+    def calculate_derived_features(self, df):
+        def calculate_daily_returns(df, columns):
+            for column in columns:
+                df[column + '_Return'] = df[column].pct_change()
+            return df
 
-        return combined_df
+        # Function to calculate log returns
+        def calculate_log_returns(df, columns):
+            for column in columns:
+                df[column + '_Log_Return'] = np.log(df[column] / df[column].shift(1))
+            return df
+
+        # Function to calculate historical volatility (rolling standard deviation of returns)
+        def calculate_volatility(df, columns, window=20):
+            for column in columns:
+                df[column + '_Volatility'] = df[column].pct_change().rolling(window=window).std() * np.sqrt(window)
+            return df
+
+        # Function to calculate the Average True Range (ATR)
+        def calculate_atr(df, high_col, low_col, close_col, window=14):
+            high_low = df[high_col] - df[low_col]
+            high_close = np.abs(df[high_col] - df[close_col].shift())
+            low_close = np.abs(df[low_col] - df[close_col].shift())
+            ranges = pd.concat([high_low, high_close, low_close], axis=1)
+            true_range = np.max(ranges, axis=1)
+            atr = true_range.rolling(window=window).mean()
+            return atr
+
+        # Calculate daily returns
+        for index in self.index_names.values():
+            # Calculate daily returns
+            df = calculate_daily_returns(df, [f'{index}_Close'])
+            # Calculate log returns
+            df = calculate_log_returns(df, [f'{index}_Close'])
+            # Calculate volatility
+            df = calculate_volatility(df, [f'{index}_Close'])
+            # Calculate ATR for each index
+            df[f'{index}_ATR'] = calculate_atr(df, f'{index}_High', f'{index}_Low', f'{index}_Close')
+        df.dropna(inplace=True)
+        return df
+
+    def one_index_data_preparator(self, df, index_name, include_derived_features=True ):
+        feature_types = ['Open', 'High', 'Low', 'Close', 'Volume']
+        derived_feature_types = ['Close_Return', 'Close_Log_Return', 'Close_Volatility', 'ATR']
+
+        basic_features = [f'{index_name}_{feature_type}' for feature_type in feature_types]
+        derived_features = [f'{index_name}_{derived_feature_type}' for derived_feature_type in derived_feature_types]
+        features = basic_features + derived_features if include_derived_features else basic_features
+
+        df_selected_features = df[features]
+
+        return df_selected_features, features
+
+
 
 
 

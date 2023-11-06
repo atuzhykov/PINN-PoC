@@ -2,6 +2,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.impute import SimpleImputer
 
+
 class DataPreprocessor:
     def __init__(self, features, target):
         self.features = features
@@ -31,5 +32,3 @@ class DataPreprocessor:
         # after the preprocessor has been fitted.
         X_imputed = self.imputer.transform(X)
         return self.scaler.transform(X_imputed)
-
-

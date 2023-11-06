@@ -1,46 +1,59 @@
-# Neural Network for Stress-Strain Prediction
+# Stock Market Prediction using Neural Networks
 
-This repository contains the implementation of a neural network model designed to predict stress-strain characteristics of materials based on experimental data. The model utilizes a GRU (Gated Recurrent Unit) architecture and incorporates physics-informed neural networks (PINNs) to enhance predictions by integrating underlying physical principles.
+## 1. Context
 
-## Features
+This project focuses on predicting stock market prices using historical data from various stock indices. We utilize advanced Deep Learning models, including Gated Recurrent Unit (GRU) networks, GRU with Attention mechanisms, and Long Short-Term Memory (LSTM) networks, to understand the temporal dependencies within stock price movements.
 
-- Data preprocessing for neural network compatibility.
-- GRU neural network model for time series prediction.
-- Custom loss function incorporating physical laws.
-- TensorBoard integration for training visualization.
-- GPU support for accelerated computation.
+### Data
 
-## Requirements
+The dataset includes daily stock prices from multiple indices such as VIX, DJI, RUT, FTSE, HSI, GDAXI, IXIC, NYA, N225, and GSPC. Each index provides several price metrics:
 
-- Python 3.x
-- TensorFlow (compatible with GPU support)
-- Keras
-- NVIDIA CUDA Toolkit (if using GPU)
-- cuDNN (if using GPU)
+- **Open**: The opening price of the stock.
+- **High**: The highest price during the trading day.
+- **Low**: The lowest price during the trading day.
+- **Close**: The final price at which the stock trades that day.
+- **Adjusted Close**: The closing price adjusted for splits and dividend distributions.
+- **Volume**: The total number of shares traded during the day.
 
-## Usage
+### Features and Derived Features
 
-1. **Data Preparation**: Use the provided data preprocessing functions or classes to prepare your dataset for training.
+**Features** are the raw data points from the dataset, such as the price levels and volume.
 
-2. **Model Configuration**: Initialize the GRU model with the desired parameters. Optionally, integrate physics-based constraints into the model's architecture or loss function.
+**Derived Features** are calculated from the original features to provide additional insights to the model. These include:
 
-3. **Training**: Train the model using the prepared dataset. Monitor training progress and performance metrics with TensorBoard.
-    ```python
-    # TensorBoard setup
-    log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1)
-    # Model training
-    model.fit(x_train, y_train, epochs=EPOCHS, validation_data=(x_val, y_val), callbacks=[tensorboard_callback])
-    ```
-4. **Evaluation and Prediction**: Evaluate the model's performance on a test dataset and use the model for stress-strain predictions.
+- **Return**: The day-over-day percentage change in the closing price.
+- **Log Return**: The natural logarithm of the return.
+- **Volatility**: The statistical measure of return dispersion.
+- **Average True Range (ATR)**: A volatility indicator derived from the true range.
 
-5. **Visualization**: Use TensorBoard to visualize training metrics, model graphs, and more. Launch TensorBoard through the command line:
-    ```bash
-    tensorboard --logdir logs/fit
-    ```
+## 2. Architecture and Training Process
 
-## Customization
+### Architecture
 
-- **Custom Loss Function**: The model supports the integration of custom loss functions, allowing the inclusion of physical laws or constraints that govern the stress-strain behavior. This approach enhances the model's predictive capability, ensuring consistency with physical reality.
+We have developed three different neural network architectures to process the sequential data:
 
-- **Model Architecture**: Users can modify the neural network architecture to experiment with different configurations, layers, or neuron counts. Adjustments can be made to optimize performance based on the specific characteristics of the dataset or experimental setup.
+- **GRU**: Utilizes GRU layers to maintain memory of previous inputs.
+- **GRU with Attention**: Incorporates an attention mechanism with GRU layers to focus on relevant parts of the input sequence.
+- **LSTM**: Employs LSTM layers known for their ability to capture long-term dependencies.
+- **LSTM with Attention**: Employs LSTM layers with attention mechanism.
+
+Each model consists of recurrent layers followed by a dense layer to predict the stock price.
+
+### Training Process
+
+The training process for each model includes:
+
+1. **Data Preprocessing**: Scaling features, creating derived features, and splitting the dataset.
+2. **Model Initialization**: Based on the chosen architecture (GRU, GRU with Attention, or LSTM).
+3. **Model Training**: Learning to predict stock prices using the training data.
+4. **Evaluation**: Assessing performance with the test dataset and plotting the loss.
+5. **Prediction**: Making predictions and inverse-scaling to compare with actual prices.
+6. **Visualization**: Plotting actual vs. predicted prices for visual assessment.
+
+### Model Selection
+
+The `TrainingPipe` class allows for easy selection and training of the desired model architecture:
+
+```python
+training_pipe = TrainingPipe(input_shape, model='GRU_with_Attention')
+training_pipe.train(X_train, y_train, X_test, y_test)
