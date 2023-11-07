@@ -91,7 +91,7 @@ class DataProcessor:
 
         return df_selected_features, features
 
-    def all_index_data_preparator(self, df, include_derived_features=True ):
+    def all_index_data_preparator(self, df, include_derived_features=True):
         feature_types = ['Open', 'High', 'Low', 'Close', 'Volume']
         derived_feature_types = ['Close_Return', 'Close_Log_Return', 'Close_Volatility', 'ATR']
         features = []

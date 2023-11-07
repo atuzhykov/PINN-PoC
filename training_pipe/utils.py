@@ -1,8 +1,11 @@
 import json
 import os
 
+import numpy as np
+from numpy import sqrt
+
 from models.models import GRUModel, GRUModelWithAttention, LSTMModel, LSTMModelWithAttention
-from sklearn.metrics import mean_absolute_error, mean_squared_error
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 from matplotlib import pyplot as plt
 
@@ -24,17 +27,23 @@ def plot_evaluations(actual_prices, flag, model, model_name, predicted_prices, s
     plt.xlabel('Time')
     plt.ylabel('Price')
     plt.legend()
-    plt.savefig(
-        f"C:\\work\\PINN-PoC\\training_pipe\\plots\\{model_name}_{sequence_length}_{flag}_actual_vs_predicted.png")
+    save_path = os.path.join(project_dir, 'plots', f"{model_name}_{sequence_length}_{flag}_actual_vs_predicted.png")
+    plt.savefig(save_path)
     plt.close()
 
 
 def save_metrics_to_json(actual_prices, predicted_prices, model_name, flag, sequence_length, project_dir):
     mae = mean_absolute_error(actual_prices, predicted_prices)
     mse = mean_squared_error(actual_prices, predicted_prices)
+    rmse = sqrt(mse)
+    mape = np.mean(np.abs((actual_prices - predicted_prices) / actual_prices)) * 100
+    r2 = r2_score(actual_prices, predicted_prices)
     metrics = {
         "MAE": mae,
         "MSE": mse,
+        "RMSE": rmse,
+        "MAPE": mape,
+        "R-squared": r2
     }
     # Specify the file path where you want to save the JSON file
     file_path = os.path.join(project_dir, 'plots', f'{model_name}_{sequence_length}_{flag}_metrics.json')
