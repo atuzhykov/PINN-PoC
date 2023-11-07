@@ -5,6 +5,7 @@ from training_pipe.utils import get_model, save_metrics_to_json, plot_evaluation
 
 import os
 
+
 def train():
     project_dir = os.path.abspath(os.path.dirname(__file__))
     pkl_path = os.path.join(project_dir, 'raw_data', 'top_indices.pkl')
@@ -15,18 +16,19 @@ def train():
     data_processor = DataProcessor(pkl_path)
     df = data_processor.save_to_dataframe()
     df = data_processor.calculate_derived_features(df)
-    for use_all_data in [True, False]:
+    for use_all_data in [False, True]:
         flag = 'all_indexes' if use_all_data else 'one_index'
+        num_dummy_features = 90 if use_all_data else 9
         df, features = data_processor.all_index_data_preparator(df,
                                                                 include_derived_features=True) if use_all_data else data_processor.one_index_data_preparator(
-            df, include_derived_features=True)
+            df, index_name=index_name, include_derived_features=True)
 
         for sequence_length in sequence_lengths:
             data_preprocessor = DataPreprocessor(df, feature_names=features, target_name=f'{index_name}_Close',
                                                  sequence_length=sequence_length)
             data_preprocessor.preprocess()
             X_train, X_test, y_train, y_test = data_preprocessor.get_train_test_data()
-            actual_prices = data_preprocessor.inverse_transform(y_test)
+            actual_prices = data_preprocessor.inverse_transform(y_test, num_dummy_features=num_dummy_features)
 
             for model_name in model_names:
                 print(f"Model {model_name} is testing on.")
@@ -37,7 +39,7 @@ def train():
                 model.train(X_train, y_train, X_test, y_test, epochs=epochs, batch_size=8)
 
                 predictions = model.predict(X_test)
-                predictions = data_preprocessor.inverse_transform(predictions)
+                predictions = data_preprocessor.inverse_transform(predictions, num_dummy_features=num_dummy_features)
                 predicted_prices = predictions
 
                 save_metrics_to_json(actual_prices, predicted_prices, model_name, flag, sequence_length, project_dir)

@@ -37,7 +37,7 @@ class DataPreprocessor:
     def get_train_test_data(self):
         return self.X_train, self.X_test, self.y_train, self.y_test
 
-    def inverse_transform(self, predictions, num_dummy_features=90):
+    def inverse_transform(self, predictions, num_dummy_features):
         predictions = predictions.reshape(-1, 1)
         dummy_features = np.zeros((predictions.shape[0], num_dummy_features))
         predictions_with_dummy = np.concatenate([predictions, dummy_features], axis=1)
