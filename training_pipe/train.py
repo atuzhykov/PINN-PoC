@@ -34,7 +34,7 @@ def train():
                 model = get_model(input_shape, model_name)
 
                 model = TrainingPipe(model=model)
-                model.train(X_train, y_train, X_test, y_test, epochs=epochs, batch_size=32)
+                model.train(X_train, y_train, X_test, y_test, epochs=epochs, batch_size=8)
 
                 predictions = model.predict(X_test)
                 predictions = data_preprocessor.inverse_transform(predictions)
