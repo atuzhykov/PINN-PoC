@@ -1,7 +1,7 @@
-from keras import Sequential, Input, Model
-from keras.src.layers import Attention, LSTM
+from tensorflow.keras import Sequential, Input, Model
+from tensorflow.keras.layers import Attention, LSTM
 from tensorflow.keras.layers import GRU, Dense, Dropout, BatchNormalization
-from tensorflow.keras.models import Sequential
+
 
 
 def GRUModel(input_shape):
