@@ -2,17 +2,27 @@ import datetime
 import os
 
 from tensorflow.keras.callbacks import TensorBoard
-
+import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
+from tensorflow.python.keras.callbacks import LearningRateScheduler
 
 
 class TrainingPipe:
     def __init__(self, model):
         # Compile the model
         self.model = model
-        self.model.compile(optimizer=Adam(learning_rate=0.001), loss='mean_squared_error')
+        self.model.compile(optimizer=Adam(learning_rate=0.0001), loss='mean_squared_error')
 
     def train(self, X_train, y_train, X_val, y_val, epochs=100, batch_size=4):
+
+        # Learning Rate Scheduler function
+        def scheduler(epoch, lr):
+            if epoch < 10:
+                return lr
+            else:
+                return lr * tf.math.exp(-0.1)
+
+        lr_scheduler = LearningRateScheduler(scheduler)
         # Set up the log directory for TensorBoard
         log_dir = os.path.join(
             "logs", "fit", datetime.datetime.now().strftime("%Y%m%d-%H%M%S")

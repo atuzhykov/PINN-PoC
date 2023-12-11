@@ -1,53 +1,43 @@
 from tensorflow.keras import Sequential, Input, Model
 from tensorflow.keras.layers import Attention, LSTM
 from tensorflow.keras.layers import GRU, Dense, Dropout, BatchNormalization
+from tensorflow.python.keras.layers import Bidirectional
 
-
-
-def GRUModel(input_shape):
-    model = Sequential()
-    # First GRU layer with Dropout
-    model.add(GRU(units=50, return_sequences=True, input_shape=input_shape))
-    model.add(Dropout(0.2))  # Dropout for regularization
-    model.add(BatchNormalization())  # Batch Normalization
-
-    # Second GRU layer
-    model.add(GRU(units=50, return_sequences=False))
-    model.add(Dropout(0.2))  # Dropout for regularization
-    model.add(BatchNormalization())  # Batch Normalization
-    # Dense layer for output
-    model.add(Dense(units=1))
-
-    return model
-
-
-def GRUModelWithAttention(input_shape):
+def LSTMModelWithAttention_v2(input_shape, n_steps):
     # Define the input layer
     inputs = Input(shape=input_shape)
 
-    # First GRU layer with Dropout and return sequences to feed into the attention layer
-    gru_out = GRU(units=50, return_sequences=True)(inputs)
-    gru_out = Dropout(0.2)(gru_out)  # Dropout for regularization
-    gru_out = BatchNormalization()(gru_out)  # Batch Normalization
+    # First Bidirectional LSTM layer with Dropout and return sequences
+    lstm_out = Bidirectional(LSTM(units=128, return_sequences=True))(inputs)
+    lstm_out = Dropout(0.4)(lstm_out)
+    lstm_out = BatchNormalization()(lstm_out)
+
+    # Second Bidirectional LSTM layer
+    lstm_out = Bidirectional(LSTM(units=128, return_sequences=True))(lstm_out)
+    lstm_out = Dropout(0.4)(lstm_out)
+    lstm_out = BatchNormalization()(lstm_out)
 
     # Attention layer
-    # Here we are using the output of the first GRU layer as both the query and the value for the attention
-    query_value = Attention()([gru_out, gru_out])
+    query_value = Attention()([lstm_out, lstm_out])
 
-    # Second GRU layer
-    gru_out_final = GRU(units=50, return_sequences=False)(query_value)
-    gru_out_final = Dropout(0.2)(gru_out_final)  # Dropout for regularization
-    gru_out_final = BatchNormalization()(gru_out_final)  # Batch Normalization
+    # Third LSTM layer
+    lstm_out_final = LSTM(units=128, return_sequences=False)(query_value)
+    lstm_out_final = Dropout(0.4)(lstm_out_final)
+    lstm_out_final = BatchNormalization()(lstm_out_final)
+
+    # Optional: Additional Dense layers
+    dense_out = Dense(units=64, activation='relu')(lstm_out_final)
+    dense_out = Dropout(0.4)(dense_out)
 
     # Dense layer for output
-    output = Dense(units=1)(gru_out_final)
+    output = Dense(units=n_steps)(dense_out)
 
     # Compile the model
     model = Model(inputs=inputs, outputs=output)
     return model
 
 
-def LSTMModelWithAttention(input_shape):
+def LSTMModelWithAttention_v1(input_shape, n_steps):
     # Define the input layer
     inputs = Input(shape=input_shape)
 
@@ -68,25 +58,36 @@ def LSTMModelWithAttention(input_shape):
     # Optional: Add additional LSTM or Dense layers if needed
 
     # Dense layer for output
-    output = Dense(units=1)(lstm_out_final)
+    output = Dense(units=n_steps)(lstm_out_final)
 
     # Compile the model
     model = Model(inputs=inputs, outputs=output)
     return model
 
 
-def LSTMModel(input_shape):
-    model = Sequential()
-    # First LSTM layer with Dropout and return sequences to feed into the attention layer
-    model.add(LSTM(units=50, return_sequences=True, input_shape=input_shape))
-    model.add(Dropout(0.2))  # Dropout for regularization
-    model.add(BatchNormalization())  # Batch Normalization
+def LSTMModelWithAttention_v3(input_shape, n_steps):
+    inputs = Input(shape=input_shape)
 
-    # Second LSTM layer
-    model.add(LSTM(units=50, return_sequences=False))
-    model.add(Dropout(0.2))  # Dropout for regularization
-    model.add(BatchNormalization())  # Batch Normalization
+    lstm_out = Bidirectional(LSTM(units=256, return_sequences=True))(inputs)
+    lstm_out = Dropout(0.4)(lstm_out)
+    lstm_out = BatchNormalization()(lstm_out)
 
-    # Dense layer for output
-    model.add(Dense(units=1))
+    lstm_out = Bidirectional(LSTM(units=256, return_sequences=True))(lstm_out)
+    lstm_out = Dropout(0.4)(lstm_out)
+    lstm_out = BatchNormalization()(lstm_out)
+
+    query_value = Attention()([lstm_out, lstm_out])
+
+    lstm_out_final = LSTM(units=256, return_sequences=False)(query_value)
+    lstm_out_final = Dropout(0.4)(lstm_out_final)
+    lstm_out_final = BatchNormalization()(lstm_out_final)
+
+    dense_out = Dense(units=128, activation='relu')(lstm_out_final)
+    dense_out = Dropout(0.4)(dense_out)
+    dense_out = Dense(units=64, activation='relu')(dense_out)
+    dense_out = Dropout(0.4)(dense_out)
+
+    output = Dense(units=n_steps)(dense_out)
+
+    model = Model(inputs=inputs, outputs=output)
     return model
