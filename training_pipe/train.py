@@ -2,7 +2,7 @@ import os
 
 import pandas as pd
 
-from preprocessing.data_preparation import PolymerDataProcessor, FinanceDataProcessor, TimeSeriesDataPreprocessor
+from preprocessing.data_preparation import PolymerDataProcessor, FinanceDataProcessor, FinanceTimeSeriesDataPreprocessor
 from training_pipe.pipeline import TrainingPipe
 from training_pipe.utils import get_model, plot_evaluations
 
@@ -26,14 +26,14 @@ def train():
     epochs = 200
     model_names = ["LSTM_with_Attention_v1", "LSTM_with_Attention_v2"]
 
-    for use_recurrence_features in [True, False]:
+    for use_recurrence_features in [False, True]:
         data_processor = FinanceDataProcessor(directory_path, use_recurrence_features=use_recurrence_features)
         dataset = data_processor.load_data()
         all_feature_names = ['RecurrenceRate', 'DiagRec', 'Determinism', 'DeteRec', 'L', 'Divergence', 'LEn', 'Laminarity',
                              'TrappingTime', 'VMax', 'VEn', 'W', 'WMax', 'WEn', 'LamiDet', 'VDiv', 'WVDiv'] if use_recurrence_features else ["Day_Index"]
 
         sequence_lengths = [3, 7, 13, 20]
-        batch_sizes = [4, 8, 16]
+        batch_sizes = [4, 8]
         lrs = [1e-2, 1e-5, 1e-6]
         n_steps = [1, 2]
         if use_recurrence_features:
@@ -43,7 +43,7 @@ def train():
                 for sequence_length in sequence_lengths:
                     for batch_size in batch_sizes:
                         for lr in lrs:
-                            data_preprocessor = TimeSeriesDataPreprocessor(dataset, feature_names,
+                            data_preprocessor = FinanceTimeSeriesDataPreprocessor(dataset, feature_names,
                                                                                   target_name=target_name,
                                                                                   sequence_length=sequence_length)
                             data_preprocessor.preprocess()
@@ -66,7 +66,7 @@ def train():
                 for sequence_length in sequence_lengths:
                     for batch_size in batch_sizes:
                         for lr in lrs:
-                            data_preprocessor = TimeSeriesDataPreprocessor(dataset, all_feature_names,
+                            data_preprocessor = FinanceTimeSeriesDataPreprocessor(dataset, all_feature_names,
                                                                            target_name=target_name,
                                                                            sequence_length=sequence_length)
                             data_preprocessor.preprocess()

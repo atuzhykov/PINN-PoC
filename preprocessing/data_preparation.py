@@ -68,22 +68,9 @@ class TimeSeriesDataPreprocessor:
         self.scaler = MinMaxScaler(feature_range=(0, 1))
 
     def preprocess(self):
-        # Exclude the 'Date' column from scaling
-        if 'Date' in self.feature_names:
-            date_data = self.dataframe['Date']
-            features_to_scale = [feature for feature in self.feature_names if feature != 'Date']
-        else:
-            date_data = None
-            features_to_scale = self.feature_names
 
-        # Select and scale the numeric features
-        df_selected = self.dataframe[features_to_scale + [self.target_name]]
+        df_selected = self.dataframe[self.feature_names + [self.target_name]]
         scaled_data = self.scaler.fit_transform(df_selected)
-
-        # If 'Date' was excluded, add it back after scaling
-        if date_data is not None:
-            scaled_data = np.concatenate([date_data.values.reshape(-1, 1), scaled_data], axis=1)
-
         X, y = self.create_sequences(scaled_data)
 
         # Find the index to split the data based on peaks
@@ -115,3 +102,42 @@ class TimeSeriesDataPreprocessor:
         unscaled_predictions = self.scaler.inverse_transform(predictions_with_dummy)
         unscaled_target = unscaled_predictions[:, 0]
         return unscaled_target
+
+
+class FinanceTimeSeriesDataPreprocessor(TimeSeriesDataPreprocessor):
+    def __init__(self, dataframe, feature_names, target_name, sequence_length=10):
+        super().__init__(dataframe, feature_names, target_name, sequence_length)
+
+    def preprocess(self):
+        # Exclude the 'Date' column from scaling
+        if 'Date' in self.feature_names:
+            date_data = self.dataframe['Date']
+            features_to_scale = [feature for feature in self.feature_names if feature != 'Date']
+        else:
+            date_data = None
+            features_to_scale = self.feature_names
+
+        # Select and scale the numeric features
+        df_selected = self.dataframe[features_to_scale + [self.target_name]]
+        scaled_data = self.scaler.fit_transform(df_selected)
+
+        # If 'Date' was excluded, add it back after scaling
+        if date_data is not None:
+            scaled_data = np.concatenate([date_data.values.reshape(-1, 1), scaled_data], axis=1)
+
+        X, y = self.create_sequences(scaled_data)
+
+        # Find the index to split the data based on peaks
+        peaks, _ = find_peaks(y, height=None)  # You can adjust the height parameter if needed
+        total_peaks = len(peaks)
+        cutoff_peak = int(total_peaks * 0.8)
+        cutoff_index = peaks[cutoff_peak]
+
+        # Split the data at the calculated index
+        self.X_train = X[:cutoff_index]
+        self.X_test = X[cutoff_index:]
+        self.y_train = y[:cutoff_index]
+        self.y_test = y[cutoff_index:]
+
+
+
