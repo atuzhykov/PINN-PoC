@@ -1,0 +1,13 @@
+{
+    "epochs": 200,
+    "model_names": "LSTM_with_Attention_v2",
+    "target_name": "Temperature",
+    "feature_names": [
+        "RecurrenceRate", "DiagRec", "Determinism", "DeteRec", "L", "Divergence",
+        "LEn", "Laminarity", "TrappingTime", "VMax", "VEn", "W", "WMax", "WEn",
+        "LamiDet", "VDiv", "WVDiv"
+    ],
+    "sequence_lengths": 20,
+    "batch_sizes": 8,
+    "learning_rates": 0.000001
+}

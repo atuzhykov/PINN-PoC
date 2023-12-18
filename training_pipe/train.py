@@ -1,51 +1,89 @@
-from preprocessing.data_preparation import DataPreprocessor
-from preprocessing.data_reader import DataProcessor
-from training_pipe.pipeline import TrainingPipe
-from training_pipe.utils import get_model, save_metrics_to_json, plot_evaluations
-
 import os
+
+import pandas as pd
+
+from preprocessing.data_preparation import PolymerDataProcessor, FinanceDataProcessor, TimeSeriesDataPreprocessor
+from training_pipe.pipeline import TrainingPipe
+from training_pipe.utils import get_model, plot_evaluations
 
 
 def train():
     project_dir = os.path.abspath(os.path.dirname(__file__))
-    pkl_path = os.path.join(project_dir, 'raw_data', 'top_indices.pkl')
-    index_name = 'DJI'
-    model_names = ["LSTM_with_Attention_v2"]
-    split_date = '2018-01-01'
-    sequence_length = 5
-    epochs = 100
-    n_step = 3
-    data_processor = DataProcessor(pkl_path)
-    df = data_processor.save_to_dataframe()
-    df = data_processor.calculate_derived_features(df)
-    use_all_data = False
-    flag = 'all_indexes' if use_all_data else 'one_index'
-    num_dummy_features = 90 if use_all_data else 9
-    df, features = data_processor.all_index_data_preparator(df, include_derived_features=True) if use_all_data else \
-        data_processor.one_index_data_preparator(df, index_name=index_name, include_derived_features=True)
 
-    data_preprocessor = DataPreprocessor(df, feature_names=features, target_name=f'{index_name}_Close',
-                                         sequence_length=sequence_length, n_steps=n_step)
-    data_preprocessor.preprocess(split_date)
-    X_train, X_test, y_train, y_test = data_preprocessor.get_train_test_data()
-    actual_prices = data_preprocessor.inverse_transform(y_test, num_dummy_features=num_dummy_features)
+    # POLYMERS
+    # directory_path = os.path.join(project_dir, 'raw_data', 'polymers')
+    # data_processor = PolymerDataProcessor(directory_path)
+    # dataset_with_pi, dataset_without_pi = data_processor.load_data()
+    # datasets = {'dataset_with_pi': dataset_with_pi,
+    #         'dataset_without_pi': dataset_without_pi}
+    # target_name = 'Temperature'
 
-    for model_name in model_names:
-        print(f"Model {model_name} is testing on.")
-        input_shape = (X_train.shape[1], X_train.shape[2])
-        model = get_model(input_shape, model_name, n_steps=n_step)
 
-        model = TrainingPipe(model=model)
-        model.train(X_train, y_train, X_test, y_test, epochs=epochs, batch_size=8)
+    # FINANCE
+    directory_path = os.path.join(project_dir, 'raw_data', 'finance')
+    target_name = 'Adj Close'
+    dataset_name = "RQA_classic_name=^DJI_window=100_step=1_rettype=6_m=1_tau=1_eps=0"
+    epochs = 200
+    model_names = ["LSTM_with_Attention_v1", "LSTM_with_Attention_v2"]
 
-        predictions = model.predict(X_test)
-        predictions = data_preprocessor.inverse_transform(predictions, num_dummy_features=num_dummy_features)
-        predicted_prices = predictions
+    for use_recurrence_features in [True, False]:
+        data_processor = FinanceDataProcessor(directory_path, use_recurrence_features=use_recurrence_features)
+        dataset = data_processor.load_data()
+        all_feature_names = ['RecurrenceRate', 'DiagRec', 'Determinism', 'DeteRec', 'L', 'Divergence', 'LEn', 'Laminarity',
+                             'TrappingTime', 'VMax', 'VEn', 'W', 'WMax', 'WEn', 'LamiDet', 'VDiv', 'WVDiv'] if use_recurrence_features else ["Day_Index"]
 
-        save_metrics_to_json(actual_prices, predicted_prices, model_name, flag, n_step, sequence_length,
-                             project_dir)
-        plot_evaluations(actual_prices, flag, model, model_name, predicted_prices, n_step, sequence_length,
-                         project_dir)
+        sequence_lengths = [3, 7, 13, 20]
+        batch_sizes = [4, 8, 16]
+        lrs = [1e-2, 1e-5, 1e-6]
+        n_steps = [1, 2]
+        if use_recurrence_features:
+            for features_num in range(1, len(all_feature_names), 3):
+                feature_names = all_feature_names[:features_num]
+            for n_step in n_steps:
+                for sequence_length in sequence_lengths:
+                    for batch_size in batch_sizes:
+                        for lr in lrs:
+                            data_preprocessor = TimeSeriesDataPreprocessor(dataset, feature_names,
+                                                                                  target_name=target_name,
+                                                                                  sequence_length=sequence_length)
+                            data_preprocessor.preprocess()
+
+                            X_train, X_test, y_train, y_test = data_preprocessor.get_train_test_data()
+
+                            for model_name in model_names:
+                                input_shape = (X_train.shape[1], X_train.shape[2])
+                                model = get_model(input_shape, model_name, n_steps=n_step)
+
+                                model = TrainingPipe(model=model)
+                                model.train(X_train, y_train, X_test, y_test, lr=lr, epochs=epochs, batch_size=batch_size)
+                                predictions = model.predict(X_test)
+
+                                plot_evaluations(y_train, y_test, predictions, model, model_name, n_step,
+                                                 sequence_length, project_dir, dataset_name, batch_size, lr, features_num)
+
+        else:
+            for n_step in n_steps:
+                for sequence_length in sequence_lengths:
+                    for batch_size in batch_sizes:
+                        for lr in lrs:
+                            data_preprocessor = TimeSeriesDataPreprocessor(dataset, all_feature_names,
+                                                                           target_name=target_name,
+                                                                           sequence_length=sequence_length)
+                            data_preprocessor.preprocess()
+
+                            X_train, X_test, y_train, y_test = data_preprocessor.get_train_test_data()
+
+                            for model_name in model_names:
+                                input_shape = (X_train.shape[1], X_train.shape[2])
+                                model = get_model(input_shape, model_name, n_steps=n_step)
+
+                                model = TrainingPipe(model=model)
+                                model.train(X_train, y_train, X_test, y_test, lr=lr, epochs=epochs, batch_size=batch_size)
+                                predictions = model.predict(X_test)
+
+                                plot_evaluations(y_train, y_test, predictions, model, model_name, n_step,
+                                                 sequence_length, project_dir, dataset_name, batch_size, lr, 1)
+
 
 
 if __name__ == "__main__":
