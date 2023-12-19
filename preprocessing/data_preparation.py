@@ -67,24 +67,6 @@ class TimeSeriesDataPreprocessor:
         self.sequence_length = sequence_length
         self.scaler = MinMaxScaler(feature_range=(0, 1))
 
-    def preprocess(self):
-
-        df_selected = self.dataframe[self.feature_names + [self.target_name]]
-        scaled_data = self.scaler.fit_transform(df_selected)
-        X, y = self.create_sequences(scaled_data)
-
-        # Find the index to split the data based on peaks
-        peaks, _ = find_peaks(y, height=None)  # You can adjust the height parameter if needed
-        total_peaks = len(peaks)
-        cutoff_peak = int(total_peaks * 0.8)
-        cutoff_index = peaks[cutoff_peak]
-
-        # Split the data at the calculated index
-        self.X_train = X[:cutoff_index]
-        self.X_test = X[cutoff_index:]
-        self.y_train = y[:cutoff_index]
-        self.y_test = y[cutoff_index:]
-
     def create_sequences(self, data):
         X, y = [], []
         for i in range(len(data) - self.sequence_length):
@@ -127,6 +109,26 @@ class FinanceTimeSeriesDataPreprocessor(TimeSeriesDataPreprocessor):
 
         X, y = self.create_sequences(scaled_data)
 
+        date_data = self.dataframe.iloc[:, 0]
+        train_ratio = 0.8
+        cutoff_index = int(len(date_data) * train_ratio)
+
+        # Split the data at the calculated index
+        self.X_train = X[:cutoff_index]
+        self.X_test = X[cutoff_index:]
+        self.y_train = y[:cutoff_index]
+        self.y_test = y[cutoff_index:]
+
+
+class PolymersTimeSeriesDataPreprocessor(TimeSeriesDataPreprocessor):
+    def __init__(self, dataframe, feature_names, target_name, sequence_length=10):
+        super().__init__(dataframe, feature_names, target_name, sequence_length)
+
+    def preprocess(self):
+        df_selected = self.dataframe[self.feature_names + [self.target_name]]
+        scaled_data = self.scaler.fit_transform(df_selected)
+        X, y = self.create_sequences(scaled_data)
+
         # Find the index to split the data based on peaks
         peaks, _ = find_peaks(y, height=None)  # You can adjust the height parameter if needed
         total_peaks = len(peaks)
@@ -138,6 +140,3 @@ class FinanceTimeSeriesDataPreprocessor(TimeSeriesDataPreprocessor):
         self.X_test = X[cutoff_index:]
         self.y_train = y[:cutoff_index]
         self.y_test = y[cutoff_index:]
-
-
-

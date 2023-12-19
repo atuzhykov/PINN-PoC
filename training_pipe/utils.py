@@ -19,7 +19,7 @@ def plot_evaluations(train, test, predicted, model, model_name, n_step, sequence
     plt.title(f'Training and Validation Loss for {model_name} sequence length: {sequence_length}')
     plt.legend()
     save_path = os.path.join(project_dir, 'plots', "finance",
-                             f'{rmse}_{title}_{model_name}_{sequence_length}_n_steps_{n_step}_bs_{batch_size}_lr_{lr}_fn_{features_num}_losses.png')
+                             f'{rmse}_{title}_{model_name}_sequence_length_{sequence_length}_n_steps_{n_step}_bs_{batch_size}_lr_{lr}_fn_{features_num}_losses.png')
     plt.savefig(save_path)
     plt.close()
 

@@ -1,6 +1,7 @@
 import datetime
 import os
 
+from tensorflow.python.keras.callbacks import EarlyStopping
 from tensorflow.keras.callbacks import TensorBoard
 import tensorflow as tf
 from tensorflow.keras.optimizers import Adam
@@ -20,6 +21,7 @@ class TrainingPipe:
                 return lr * tf.math.exp(-0.1)
 
         lr_scheduler_callback = LearningRateScheduler(scheduler)
+        early_stopping_callback = EarlyStopping(monitor='val_loss', patience=10, verbose=1, restore_best_weights=True)
         log_dir = os.path.join(
             "logs", "fit", datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
         )
@@ -28,7 +30,7 @@ class TrainingPipe:
         self.history = self.model.fit(
             X_train, y_train, epochs=epochs, batch_size=batch_size,
             validation_data=(X_val, y_val), verbose=1,
-            callbacks=[tensorboard_callback, lr_scheduler_callback]
+            callbacks=[tensorboard_callback, lr_scheduler_callback, early_stopping_callback]
         )
 
     def evaluate(self, X_test, y_test):
