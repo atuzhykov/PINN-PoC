@@ -1,59 +1,90 @@
-from preprocessing.data_reader import *
-from preprocessing.data_preparation import *
-from models.GRU import *
-import tensorflow as tf
+import os
+
+import pandas as pd
+
+from preprocessing.data_preparation import PolymerDataProcessor, FinanceDataProcessor, FinanceTimeSeriesDataPreprocessor
+from training_pipe.pipeline import TrainingPipe
+from training_pipe.utils import get_model, plot_evaluations
 
 
-def train_PINN():
-    # Check if TensorFlow can access the GPU
-    print("Num GPUs Available: ", tf.config.list_physical_devices('GPU'))
+def train():
+    project_dir = os.path.abspath(os.path.dirname(__file__))
 
-    # To see the device name
-    if tf.test.is_gpu_available():
-        print(tf.test.gpu_device_name())
+    # POLYMERS
+    # directory_path = os.path.join(project_dir, 'raw_data', 'polymers')
+    # data_processor = PolymerDataProcessor(directory_path)
+    # dataset_with_pi, dataset_without_pi = data_processor.load_data()
+    # datasets = {'dataset_with_pi': dataset_with_pi,
+    #         'dataset_without_pi': dataset_without_pi}
+    # target_name = 'Temperature'
 
 
-    file_path = r'C:\PINN-PoC\raw_data\Oe_Zugversuch_MethodeB.xls'
-    sheets_names = [f"Probe {i}" for i in range(1, 12)]
-    excel_reader = ExcelReader(file_path=file_path, sheets_names=sheets_names)
+    # FINANCE
+    directory_path = os.path.join(project_dir, 'raw_data', 'finance')
+    target_name = 'Adj Close'
+    dataset_name = "RQA_classic_name=^DJI_window=100_step=1_rettype=6_m=1_tau=1_eps=0"
+    epochs = 100
+    model_names = ["LSTM_with_Attention_v1", "LSTM_with_Attention_v2"]
 
-    # Read the data from the Excel file
-    data = excel_reader.read_data()
+    for use_recurrence_features in [True]:
+        data_processor = FinanceDataProcessor(directory_path, use_recurrence_features=use_recurrence_features)
+        dataset = data_processor.load_data()
+        all_feature_names = ['RecurrenceRate', 'DiagRec', 'Determinism', 'DeteRec', 'L', 'Divergence', 'LEn', 'Laminarity',
+                             'TrappingTime', 'VMax', 'VEn', 'W', 'WMax', 'WEn', 'LamiDet', 'VDiv', 'WVDiv'] if use_recurrence_features else ["Day_Index"]
 
-    # Create an instance of DataProcessor
-    data_processor = DataProcessor(data)
+        sequence_lengths = [3, 7, 13, 20]
+        batch_sizes = [4, 8]
+        lrs = [1e-3, 1e-5, 1e-6]
+        n_steps = [1]
+        if use_recurrence_features:
+            for features_num in range(1, len(all_feature_names), 3):
+                feature_names = all_feature_names[:features_num]
+                for n_step in n_steps:
+                    for sequence_length in sequence_lengths:
+                        for batch_size in batch_sizes:
+                            for lr in lrs:
+                                data_preprocessor = FinanceTimeSeriesDataPreprocessor(dataset, feature_names,
+                                                                                      target_name=target_name,
+                                                                                      sequence_length=sequence_length)
+                                data_preprocessor.preprocess()
 
-    # Save the data to a pandas DataFrame
-    df = data_processor.save_to_dataframe()
-    features = ['Standardkraft (MPa)', 'Traversenweg absolut (mm)', 'Traversengeschwindigkeit (mm/min)',
-                'Verfestigungsexponent ()', 'senkrechte Anisotropie ()', ' (s/Mpa)']
-    target = 'Dehnung (%)'
+                                X_train, X_test, y_train, y_test = data_preprocessor.get_train_test_data()
 
-    # Create an instance of the preprocessor class
-    preprocessor = DataPreprocessor(features, target)
+                                for model_name in model_names:
+                                    input_shape = (X_train.shape[1], X_train.shape[2])
+                                    model = get_model(input_shape, model_name, n_steps=n_step)
 
-    # Assuming 'df' is your DataFrame
-    X, y = preprocessor.fit_transform(df)
+                                    model = TrainingPipe(model=model)
+                                    model.train(X_train, y_train, X_test, y_test, lr=lr, epochs=epochs, batch_size=batch_size)
+                                    predictions = model.predict(X_test)
 
-    # Split the data
-    X_train, X_test, y_train, y_test = preprocessor.split_data(X, y)
+                                    plot_evaluations(y_train, y_test, predictions, model, model_name, n_step,
+                                                     sequence_length, project_dir, dataset_name, batch_size, lr, features_num)
 
-    X_train = X_train.astype('float32')
-    y_train = y_train.astype('float32')
-    X_test = X_test.astype('float32')
-    y_test = y_test.astype('float32')
-    X_train = X_train.reshape((X_train.shape[0], 1, X_train.shape[1]))
-    X_test = X_test.reshape((X_test.shape[0], 1, X_test.shape[1]))
+        else:
+            for n_step in n_steps:
+                for sequence_length in sequence_lengths:
+                    for batch_size in batch_sizes:
+                        for lr in lrs:
+                            data_preprocessor = FinanceTimeSeriesDataPreprocessor(dataset, all_feature_names,
+                                                                           target_name=target_name,
+                                                                           sequence_length=sequence_length)
+                            data_preprocessor.preprocess()
 
-    # Create an instance of the GRUModel class
-    gru_model = BidirectionalGRUModel(input_shape=(None, len(features)), units=100, output_size=1)
+                            X_train, X_test, y_train, y_test = data_preprocessor.get_train_test_data()
 
-    # Train the model
-    history = gru_model.train_model(X_train, y_train)
+                            for model_name in model_names:
+                                input_shape = (X_train.shape[1], X_train.shape[2])
+                                model = get_model(input_shape, model_name, n_steps=n_step)
 
-    # Evaluate the model
-    performance = gru_model.evaluate_model(X_test, y_test)
+                                model = TrainingPipe(model=model)
+                                model.train(X_train, y_train, X_test, y_test, lr=lr, epochs=epochs, batch_size=batch_size)
+                                predictions = model.predict(X_test)
+
+                                plot_evaluations(y_train, y_test, predictions, model, model_name, n_step,
+                                                 sequence_length, project_dir, dataset_name, batch_size, lr, 0)
+
 
 
 if __name__ == "__main__":
-    train_PINN()
+    train()
