@@ -2,6 +2,7 @@ import json
 import os
 
 import numpy as np
+import pandas as pd
 from numpy import sqrt
 
 from models.models import LSTMModelWithAttention_v1, LSTMModelWithAttention_v2, LSTMModelWithAttention_v3
@@ -11,7 +12,7 @@ from matplotlib import pyplot as plt
 
 
 def plot_evaluations(train, test, predicted, model, model_name, n_step, sequence_length, project_dir, title, batch_size,
-                     lr, features_num):
+                     lr, features_num, datetime_range):
     _, _, rmse, _ = get_metrics(test, predicted)
     rmse = str(round(rmse, 4))
     plt.plot(model.history.history['loss'], label='train')
@@ -26,11 +27,11 @@ def plot_evaluations(train, test, predicted, model, model_name, n_step, sequence
     plt.figure(figsize=(12, 6))
 
     full_series = np.concatenate([train, test])
-    plt.plot(full_series, label='Full Series (Train + Test)', color='blue')
+    cutoff_index = len(full_series) - len(datetime_range)
+    datetime_range = datetime_range[:cutoff_index]
+    plt.plot(datetime_range, full_series.flatten(), label='Full Series (Train + Test)', color='blue')
 
-    test_index_start = len(train)
-    test_index_end = test_index_start + len(predicted)
-    plt.plot(range(test_index_start, test_index_end), predicted, label='Predicted', color='red', linestyle='--')
+    plt.plot(datetime_range[len(train):], predicted, label='Predicted', color='red', linestyle='--')
     plt.title(title)
     plt.xlabel('Time')
     plt.ylabel('Value')
